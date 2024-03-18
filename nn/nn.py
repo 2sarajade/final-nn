@@ -109,12 +109,13 @@ class NeuralNetwork:
         function_dict = {'sigmoid':self._sigmoid, 'relu':self._relu}
         activation_func = function_dict.get(activation)
 
-        Z_curr = np.dot(W_curr, A_prev) + b_curr
+        Z_curr = np.dot(W_curr, A_prev.T) + b_curr
 
         #run activation function chosen from the dict based on params
         A_curr = activation_func(Z_curr)
 
-        return A_curr, Z_curr
+        #addint .T for training issues
+        return A_curr.T, Z_curr
 
     def forward(self, X: ArrayLike) -> Tuple[ArrayLike, Dict[str, ArrayLike]]:
         """
@@ -184,11 +185,11 @@ class NeuralNetwork:
         activation_func = function_dict.get(activation_curr)
 
         #calculate
-        dZ_curr = activation_func(dA_curr, Z_curr)
+        dZ_curr = activation_func(dA_curr.T, Z_curr)
 
-        dW_curr = np.dot(dZ_curr, A_prev.T)
+        dW_curr = np.dot(dZ_curr, A_prev)
         db_curr = np.sum(dZ_curr, axis = 1, keepdims = True)
-        dA_prev = np.dot(W_curr.T, dZ_curr)
+        dA_prev = np.dot(W_curr.T, dZ_curr).T
 
         return dA_prev, dW_curr, db_curr
 
@@ -241,8 +242,8 @@ class NeuralNetwork:
                 Dictionary containing the gradient information from most recent round of backprop.
         """
         for idx, layer in enumerate(self.arch, 1):
-            self._param_dict['W' + str(idx)] -= (self._lr * self.grad_dict.get('dW' + str(idx)))
-            self._param_dict['b' + str(idx)] -= (self._lr * self.grad_dict.get('db' + str(idx)))
+            self._param_dict['W' + str(idx)] -= (self._lr * grad_dict.get('dW' + str(idx)))
+            self._param_dict['b' + str(idx)] -= (self._lr * grad_dict.get('db' + str(idx)))
 
     def fit(
         self,
@@ -271,12 +272,14 @@ class NeuralNetwork:
             per_epoch_loss_val: List[float]
                 List of per epoch loss for validation set.
         """
-        function_dict = {'_binary_cross_entropy':self._binary_cross_entropy_backprop, '_mean_squared_error':self._mean_squared_error_backprop}
+        function_dict = {'_binary_cross_entropy':self._binary_cross_entropy, '_mean_squared_error':self._mean_squared_error}
         loss_func = function_dict.get(self._loss_func)
         per_epoch_loss_train = []
         per_epoch_loss_val = []
         
         for epoch in range(self._epochs):
+            if epoch % 100 == 0:
+                print("epoch", epoch, "out of", self._epochs)
             # need to add batch control in here
             # forward
             y_train_hat, cache_train = self.forward(X_train)
@@ -436,4 +439,4 @@ class NeuralNetwork:
             dA: ArrayLike
                 partial derivative of loss with respect to A matrix.
         """
-        return 2/len(y) * (y - y_hat)
+        return -2/len(y) * (y - y_hat)
