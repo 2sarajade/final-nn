@@ -1,3 +1,4 @@
+![BuildStatus](https://github.com/2sarajade/final-nn/actions/workflows/main.yml/badge.svg?event=push)
 # Final project: neural network
 
 ## Overview
