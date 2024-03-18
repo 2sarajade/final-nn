@@ -106,7 +106,15 @@ class NeuralNetwork:
             Z_curr: ArrayLike
                 Current layer linear transformed matrix.
         """
-        pass
+        function_dict = {'sigmoid':self._sigmoid, 'relu':self._relu}
+        activation_func = function_dict.get(activation)
+
+        Z_curr = np.dot(W_curr, A_prev) + b_curr
+
+        #run activation function chosen from the dict based on params
+        A_curr = activation_func(Z_curr)
+
+        return A_curr, Z_curr
 
     def forward(self, X: ArrayLike) -> Tuple[ArrayLike, Dict[str, ArrayLike]]:
         """
@@ -122,7 +130,20 @@ class NeuralNetwork:
             cache: Dict[str, ArrayLike]:
                 Dictionary storing Z and A matrices from `_single_forward` for use in backprop.
         """
-        pass
+        A_curr = X
+        cache = {'A0': A_curr}
+        for idx, layer in enumerate(self.arch, 1):
+            # setup layer
+            W_curr = self._param_dict.get('W' + str(idx))
+            b_curr = self._param_dict.get('b' + str(idx))
+            A_prev = A_curr
+            activation = layer.get('activation')
+            # run layer
+            A_curr, Z_curr = self._single_forward(W_curr, b_curr, A_prev, activation)
+            # add to cache
+            cache['A' + str(idx)] = A_curr
+            cache['Z' + str(idx)] = Z_curr
+        return A_curr, cache
 
     def _single_backprop(
         self,
@@ -158,7 +179,19 @@ class NeuralNetwork:
             db_curr: ArrayLike
                 Partial derivative of loss function with respect to current layer bias matrix.
         """
-        pass
+        # get backprop function
+        function_dict = {'sigmoid':self._sigmoid_backprop, 'relu':self._relu_backprop}
+        activation_func = function_dict.get(activation_curr)
+
+        #calculate
+        dZ_curr = activation_func(dA_curr, Z_curr)
+
+        dW_curr = np.dot(dZ_curr, A_prev.T)
+        db_curr = np.sum(dZ_curr, axis = 1, keepdims = True)
+        dA_prev = np.dot(W_curr.T, dZ_curr)
+
+        return dA_prev, dW_curr, db_curr
+
 
     def backprop(self, y: ArrayLike, y_hat: ArrayLike, cache: Dict[str, ArrayLike]):
         """
@@ -177,7 +210,26 @@ class NeuralNetwork:
             grad_dict: Dict[str, ArrayLike]
                 Dictionary containing the gradient information from this pass of backprop.
         """
-        pass
+        function_dict = {'_binary_cross_entropy':self._binary_cross_entropy_backprop, '_mean_squared_error':self._mean_squared_error_backprop}
+        loss_func = function_dict.get(self._loss_func)
+        grad_dict = {}
+
+        dA_prev = loss_func(y, y_hat)
+        #iterate though the layers
+        for i in reversed(range(1, len(self.arch) + 1)):
+            #retrieve params
+            dA_curr = dA_prev
+            W_curr = self._param_dict.get('W' + str(i))
+            b_curr = self._param_dict.get('b' + str(i))
+            activation_curr = self.arch[i-1].get('activation')
+            Z_curr = cache.get('Z' + str(i))
+            A_prev = cache.get('A' + str(i-1))
+            #run single layer of backprop
+            dA_prev, dW_curr, db_curr = self._single_backprop(W_curr, b_curr, Z_curr, A_prev, dA_curr, activation_curr)
+            # add to cache
+            grad_dict['dW' + str(i)] = dW_curr
+            grad_dict['db' + str(i)] = db_curr
+        return grad_dict
 
     def _update_params(self, grad_dict: Dict[str, ArrayLike]):
         """
@@ -188,7 +240,9 @@ class NeuralNetwork:
             grad_dict: Dict[str, ArrayLike]
                 Dictionary containing the gradient information from most recent round of backprop.
         """
-        pass
+        for idx, layer in enumerate(self.arch, 1):
+            self._param_dict['W' + str(idx)] -= (self._lr * self.grad_dict.get('dW' + str(idx)))
+            self._param_dict['b' + str(idx)] -= (self._lr * self.grad_dict.get('db' + str(idx)))
 
     def fit(
         self,
@@ -217,7 +271,29 @@ class NeuralNetwork:
             per_epoch_loss_val: List[float]
                 List of per epoch loss for validation set.
         """
-        pass
+        function_dict = {'_binary_cross_entropy':self._binary_cross_entropy_backprop, '_mean_squared_error':self._mean_squared_error_backprop}
+        loss_func = function_dict.get(self._loss_func)
+        per_epoch_loss_train = []
+        per_epoch_loss_val = []
+        
+        for epoch in range(self._epochs):
+            # need to add batch control in here
+            # forward
+            y_train_hat, cache_train = self.forward(X_train)
+            y_val_hat, cache_val = self.forward(X_val)
+            # loss
+            loss_train = loss_func(y_train, y_train_hat)
+            loss_val = loss_func(y_val, y_val_hat)
+            # back
+            grad_dict_train = self.backprop(y_train, y_train_hat, cache_train)
+            # update
+            self._update_params(grad_dict_train)
+
+            # output
+            per_epoch_loss_train.append(loss_train)
+            per_epoch_loss_val.append(loss_val)
+        return per_epoch_loss_train, per_epoch_loss_val
+
 
     def predict(self, X: ArrayLike) -> ArrayLike:
         """
@@ -231,7 +307,8 @@ class NeuralNetwork:
             y_hat: ArrayLike
                 Prediction from the model.
         """
-        pass
+        y_hat, cache = self.forward(X)
+        return y_hat
 
     def _sigmoid(self, Z: ArrayLike) -> ArrayLike:
         """
