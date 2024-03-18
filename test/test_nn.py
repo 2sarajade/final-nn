@@ -18,7 +18,7 @@ def test_single_forward():
     true_A_curr = np.array([[.5, 1]])
     assert np.allclose(Z_curr, true_Z_curr)
     assert np.allclose(A_curr, true_A_curr)
-    
+
 
 
 def test_forward():

@@ -215,6 +215,7 @@ class NeuralNetwork:
         loss_func = function_dict.get(self._loss_func)
         grad_dict = {}
 
+        y = y.reshape(y_hat.shape)
         dA_prev = loss_func(y, y_hat)
         #iterate though the layers
         for i in reversed(range(1, len(self.arch) + 1)):
